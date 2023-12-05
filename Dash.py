@@ -37,14 +37,14 @@ class Dashboard2:
         self.sidebar.place(x=0, y=0, width=300, height=750)
 
         # Complete sidebar setup
-        self.logoImage = ImageTk.PhotoImage(file='images/Logos.png')
+        self.logoImage = ImageTk.PhotoImage(file='pitch-master\images\Logos.png')
         self.logo = Label(self.sidebar, image=self.logoImage, bg='#00ff85')
         self.logo.place(x=-120, y=-140)
 
         self.brandName = Label(self.sidebar, text='Pitch Master', bg='#00ff85', font=("", 15, "bold"))
         self.brandName.place(x=80, y=200)
 
-        self.dashboardImage = ImageTk.PhotoImage(file='images/dashboard-icon.png')
+        self.dashboardImage = ImageTk.PhotoImage(file='pitch-master\images\dashboard-icon.png')
         self.dashboard = Label(self.sidebar, image=self.dashboardImage, bg='#00ff85')
         self.dashboard.place(x=35, y=289)
 
