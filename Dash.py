@@ -4,6 +4,9 @@ from datetime import *
 import time
 from database import get_db_connection
 from tkinter import ttk
+import mysql.connector
+import customtkinter
+
 
 mydb = get_db_connection()
 mycursor = mydb.cursor()
@@ -14,8 +17,7 @@ class Dashboard2:
         self.window.title("System Management Dashboard")
         self.window.geometry("1366x744")
         self.window.resizable(False, False)
-        self.window.config(background='#e90052')
-        
+        self.window.config(background='#38003c')
         self.create_header()
         self.create_sidebar()
         self.create_date_time_display()
@@ -23,7 +25,7 @@ class Dashboard2:
         self.dashboard_text.config(command=self.show_teams_page)
         self.manage_text.config(command=self.show_players_page)
         self.settings_text.config(command=self.show_matches_page)
-        self.Exit_text.config(command=self.show_transfers_page)
+        self.Exit_text.config(command=self.show_league_page)
         self.injuries_text.config(command=self.show_injuries_page)
         self.show_teams_page()
 
@@ -72,7 +74,7 @@ class Dashboard2:
         self.Exit = Label(self.sidebar, image=self.ExitImage, bg='#00ff85')
         self.Exit.place(x=25, y=452)
 
-        self.Exit_text = Button(self.sidebar, text="Transfers", bg='#00ff85', font=("", 13, "bold"), bd=0,
+        self.Exit_text = Button(self.sidebar, text="League", bg='#00ff85', font=("", 13, "bold"), bd=0,
                                 cursor='hand2', activebackground='#00ff85')
         self.Exit_text.place(x=85, y=462)
 
@@ -107,73 +109,256 @@ class Dashboard2:
 
     def show_teams_page(self):
         self.clear_window()
-
         # Heading
-        self.heading = Label(self.window, text='Teams', font=("", 15, "bold"), fg='#ffffff', bg='#e90052')
+        self.heading = Label(self.window, text='Teams', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
         self.heading.place(x=325, y=70)
-
-        # Query the database to get the data from the 'teams2021' table
-        mycursor.execute("SELECT * FROM teams2021")
-
-        # Get the first team
-        self.current_team = mycursor.fetchone()
-
-        # Display the team
-        self.display_team()
-
-        # Next button
-        self.next_button = Button(self.window, text="Next", command=self.next_team)
-        self.next_button.place(x=400, y=250)
-
-        # Previous button
-        self.prev_button = Button(self.window, text="Previous", command=self.prev_team)
-        self.prev_button.place(x=300, y=250)
-
-    def display_team(self):
-        # Clear the previous team
-        self.clear_window()
-
-        # Display the current team
-        if self.current_team is not None:
-            for i, value in enumerate(self.current_team):
-                Label(self.window, text=f"{mycursor.description[i][0]}: {value}").place(x=400, y=100 + i*30)
-
-    def next_team(self):
-        # Get the next team
-        self.current_team = mycursor.fetchone()
-
-        # Display the team
-        self.display_team()
-
-    def prev_team(self):
-        # Get the previous team
-        mycursor.scroll(-1, mode='relative')
-        self.current_team = mycursor.fetchone()
-
-        # Display the team
-        self.display_team()
         
-    def search_teams(self):
-        pass
+        # Team and Season Selection
+        self.selected_team = StringVar(self.window)
+        self.selected_season = StringVar(self.window)
+        self.teams = self.fetch_teams()
+        self.seasons = ['2021', '2022']  # Assuming you have these two seasons
+
+        self.selected_team.set(self.teams[0])
+        self.selected_season.set(self.seasons[0])
+
+        self.team_dropdown = OptionMenu(self.window, self.selected_team, *self.teams, command=self.update_team_stats)
+        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.update_team_stats)
+
+        self.team_dropdown.place(x=400, y=100)
+        self.season_dropdown.place(x=500, y=100)
+
+        # Labels for Statistics
+        self.stat_labels = {
+            "Wins": StringVar(),
+            "Draw": StringVar(),
+            "Losses": StringVar(),
+            "Goal Scored": StringVar(),
+            "Goal Conceded": StringVar(),
+            "Goal Difference": StringVar(),
+            "Clean Sheets": StringVar(),
+            "Average Possession": StringVar(),
+            "Shots": StringVar(),
+        }
+
+        label_x = 400  # Starting x position for labels
+        value_x = label_x + 500  # label_value_spacing = 500
+        initial_y = 150  # Starting y position for the first statistic label
+        y_increment = 50  
+        # Place labels and their respective dynamic values
+        for i, (label_text, var) in enumerate(self.stat_labels.items()):
+            Label(self.window, text=label_text, font=("", 12), fg='white', bg='#38003c').place(x=label_x, y=initial_y + i*y_increment)
+            Label(self.window, textvariable=var, font=("", 12), fg='white', bg='#38003c').place(x=value_x, y=initial_y + i*y_increment)
+
+        # Initially populate stats for the default team and season
+        self.update_team_stats()
+
+    def fetch_teams(self):
+        # Function to fetch available teams from the database for both seasons
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        # Fetch teams from both seasons, this assumes the team names are the same across both tables
+        query = "SELECT DISTINCT team_name FROM teams2021 UNION SELECT DISTINCT team_name FROM teams2022 ORDER BY team_name"
+        mycursor.execute(query)
+        result = mycursor.fetchall()
+        teams = [team[0] for team in result]
+        mycursor.close()
+        mydb.close()
+        return teams
+
+    def update_team_stats(self, *args):
+        team = self.selected_team.get()
+        season = self.selected_season.get()
+        stats = self.get_team_stats_from_db(team, season)
+        for stat_name, var in self.stat_labels.items():
+            var.set(stats.get(stat_name, 'N/A'))  # Use 'N/A' if the stat is not found
+
+    def get_team_stats_from_db(self, team, season):
+        table_name = f"teams{season}"
+        mydb = get_db_connection()
+        mycursor = mydb.cursor(dictionary=True)
+        query = f"SELECT * FROM {table_name} WHERE team_name = %s"
+        mycursor.execute(query, (team,))
+        stats_row = mycursor.fetchone()
+        mycursor.close()
+        mydb.close()
+        if stats_row:
+            return {
+                # Use the correct column names as per your table schema
+                'Wins': stats_row['wins_home'] + stats_row['wins_away'],
+                'Draw': stats_row['draws_home'] + stats_row['draws_away'],
+                'Losses': stats_row['losses_home'] + stats_row['losses_away'],
+                'Goal Scored': stats_row['goals_scored'],
+                'Goal Conceded': stats_row['goals_conceded'],
+                'Goal Difference': stats_row['goal_difference'],
+                'Clean Sheets': stats_row['clean_sheets'],
+                'Average Possession': f"{stats_row['average_possession']}%",  # Adjust this if your column has a different name
+                'Shots': stats_row['shots_on_target'] + stats_row['shots_off_target'],  # Adjust if your columns have different names
+            }
+        else:
+            return {stat: 'N/A' for stat in self.stat_labels}
+
+
+  
 
     def show_players_page(self):
         self.clear_window()
-        self.heading = Label(self.window, text='Players', font=("", 15, "bold"), fg='#ffffff', bg='#e90052')
+        self.heading = Label(self.window, text='Players', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
         self.heading.place(x=325, y=70)
 
     def show_matches_page(self):
         self.clear_window()
-        self.heading = Label(self.window, text='Matches', font=("", 15, "bold"), fg='#ffffff', bg='#e90052')
+        self.heading = Label(self.window, text='Matches', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
         self.heading.place(x=325, y=70)
 
-    def show_transfers_page(self):
+    def show_league_page(self):
         self.clear_window()
-        self.heading = Label(self.window, text='Transfers', font=("", 15, "bold"), fg='#ffffff', bg='#e90052')
-        self.heading.place(x=325, y=70)
+
+        sidebar_width = 300  
+        content_padding = 50  
+        dropdown_width = 10
+        label_value_spacing = 500    
+
+        pl_logo = Image.open('images/pl_logo.png')  
+        pl_logo = pl_logo.resize((350, 300), Image.ANTIALIAS)  # Resize the image if needed and preserve aspect ratio
+        pl_logo = ImageTk.PhotoImage(pl_logo)
+
+        pl_logo_label = Label(self.window, image=pl_logo, bg='#38003c')
+        pl_logo_label.image = pl_logo  
+        pl_logo_label.place(x=300, y=120)
+
+        Label(self.window, text="Select Season", font=("", 18, "bold"), fg='white', bg='#38003c').place(x=683, y=65)
+
+        dropdown_y = 140
+
+        winner = self.get_winner_from_db('2021') 
+        Label(self.window, text="WINNER", font=("", 15, "bold"), fg='white', bg='#38003c').place(x=sidebar_width + content_padding, y=430)
+        Label(self.window, text=winner, font=("", 15, "bold"), fg='white', bg='#38003c').place(x=sidebar_width + content_padding, y=470)
+
+        self.selected_season = StringVar(self.window)
+        self.seasons = self.fetch_seasons()
+        self.selected_season.set(self.seasons[0])
+        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.update_stats)
+        self.season_dropdown.config(width=dropdown_width)
+        # Adjust x position to the right, place the dropdown below the header
+        self.season_dropdown.place(x=715, y=105)
+
+        # Place labels and values
+        self.stat_labels = {
+            "Number of Teams Participated": StringVar(),
+            "Matches Conducted": StringVar(),
+            "Total Game Week": StringVar(),
+            "Average Goals per Match": StringVar(),
+            "Clean Sheets Percentage": StringVar(),
+            "Average Corners per Match": StringVar(),
+            "Total Corners": StringVar(),
+            "Average Cards per Match": StringVar(),
+            "Total Cards": StringVar(),
+        }
+        
+        label_x = 650  # Increase padding to move to the right
+        value_x = label_x + label_value_spacing
+        initial_y = dropdown_y + 40  # Start below the dropdown
+        y_increment = 50
+
+        for i, (label_text, var) in enumerate(self.stat_labels.items()):
+            # Adjust x position to the right
+            Label(self.window, text=label_text, font=("", 12), fg='white', bg='#38003c', anchor='w').place(x=label_x, y=initial_y + (i * y_increment))
+            Label(self.window, textvariable=var, font=("", 12), fg='white', bg='#38003c', anchor='e').place(x=value_x, y=initial_y + (i * y_increment))
+        
+        # Initially populate stats for the default season
+        self.update_stats(self.selected_season.get())
+
+
+    def fetch_seasons(self):
+        # Function to fetch available seasons from the database
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        mycursor.execute("SHOW TABLES LIKE 'league%'")  # Query to fetch tables with league stats
+        result = mycursor.fetchall()
+        seasons = [season[0].replace('league', '') for season in result]  # Extract season years
+        mycursor.close()
+        mydb.close()
+        return seasons
+
+    def update_stats(self, season):
+        year = season.split(' - ')[0]
+        stats = self.get_stats_from_db(year)
+        if stats:
+            self.stat_labels["Number of Teams Participated"].set(stats['number_of_clubs'])
+            self.stat_labels["Matches Conducted"].set(stats['matches_completed'])
+            self.stat_labels["Total Game Week"].set(stats['total_game_week'])
+            self.stat_labels["Average Goals per Match"].set(stats['average_goals_per_match'])
+            self.stat_labels["Clean Sheets Percentage"].set(stats['clean_sheets_percentage'])
+            self.stat_labels["Average Corners per Match"].set(stats['average_corners_per_match'])
+            self.stat_labels["Total Corners"].set(stats['total_corners_for_season'])
+            self.stat_labels["Average Cards per Match"].set(stats['average_cards_per_match'])
+            self.stat_labels["Total Cards"].set(stats['total_cards_for_season'])
+
+    def get_winner_from_db(self, year):
+        table_name = f"teams{year}"  
+        mydb = get_db_connection()
+        mycursor = mydb.cursor(dictionary=True)
+        query = f"SELECT team_name FROM {table_name} WHERE league_position = 1"
+        mycursor.execute(query)
+        winner = mycursor.fetchone()
+        mycursor.close()
+        mydb.close()
+        if winner:
+            return winner['team_name']
+        else:
+            return "Winner Not Found"
+
+    def get_stats_from_db(self, season):
+        # Function to query the database and return stats for the selected season
+        table_name = f"league{season.replace(' - ', '')}"  # Convert season to table name
+        mydb = get_db_connection()
+        mycursor = mydb.cursor(dictionary=True)
+        query = f"SELECT * FROM {table_name}"
+        mycursor.execute(query)
+        stats_row = mycursor.fetchone()
+        mycursor.close()
+        mydb.close()
+        if stats_row:
+            # Assuming the column names in the database match the stat_labels keys
+            return {key: stats_row[key.replace(' ', '_').lower()] for key in self.stat_labels}
+        else:
+            return {key: "N/A" for key in self.stat_labels}  # Return "N/A" if no data is found
+
+# Rest of your Tkinter setup and main loop
+
+    def get_stats_from_db(self, year):
+        table_name = f"league{year}"  # Construct the table name based on the year
+        mydb = get_db_connection()
+        mycursor = mydb.cursor(dictionary=True)
+        query = f"SELECT * FROM {table_name} LIMIT 1"  # Assuming there's only one row per season table
+        mycursor.execute(query)
+        stats_row = mycursor.fetchone()
+        mycursor.close()
+        mydb.close()
+        if stats_row:
+            # Return the stats row if data was found
+            return stats_row
+        else:
+            # Return a dictionary with None values if no data was found
+            return {
+                'number_of_clubs': None,
+                'matches_completed': None,
+                'total_game_week': None,
+                'average_goals_per_match': None,
+                'clean_sheets_percentage': None,
+                'average_corners_per_match': None,
+                'total_corners_for_season': None,
+                'average_cards_per_match': None,
+                'total_cards_for_season': None
+            }
+
+
+
 
     def show_injuries_page(self):
         self.clear_window()
-        self.heading = Label(self.window, text='Injuries', font=("", 15, "bold"), fg='#ffffff', bg='#e90052')
+        self.heading = Label(self.window, text='Injuries', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
         self.heading.place(x=325, y=70)
 
 def wind():
