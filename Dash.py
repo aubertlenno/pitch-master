@@ -6,7 +6,8 @@ from database import get_db_connection
 from tkinter import ttk
 import mysql.connector
 import customtkinter
-
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 mydb = get_db_connection()
 mycursor = mydb.cursor()
@@ -26,7 +27,6 @@ class Dashboard2:
         self.manage_text.config(command=self.show_players_page)
         self.settings_text.config(command=self.show_matches_page)
         self.Exit_text.config(command=self.show_league_page)
-        self.injuries_text.config(command=self.show_injuries_page)
         self.show_teams_page()
 
 
@@ -78,13 +78,6 @@ class Dashboard2:
                                 cursor='hand2', activebackground='#00ff85')
         self.Exit_text.place(x=85, y=462)
 
-        self.injuriesImage = ImageTk.PhotoImage(file='images/settings-icon.png')
-        self.injuries = Label(self.sidebar, image=self.injuriesImage, bg='#00ff85')
-        self.injuries.place(x=35, y=510)
-
-        self.injuries_text = Button(self.sidebar, text="Injuries", bg='#00ff85', font=("", 13, "bold"), bd=0,
-                                    cursor='hand2', activebackground='#00ff85')
-        self.injuries_text.place(x=80, y=515)
 
     def create_date_time_display(self):
         self.clock_image = ImageTk.PhotoImage(file="images/time.png")
@@ -114,19 +107,30 @@ class Dashboard2:
         self.heading.place(x=325, y=70)
         
         # Team and Season Selection
-        self.selected_team = StringVar(self.window)
+         # Season Selection
         self.selected_season = StringVar(self.window)
-        self.teams = self.fetch_teams()
-        self.seasons = ['2021', '2022']  # Assuming you have these two seasons
+        self.seasons = ['2021', '2022']
+        self.selected_season.set('2021')
+        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.on_season_select)
+        self.season_dropdown.place(x=400, y=100)
+        
 
-        self.selected_team.set(self.teams[0])
-        self.selected_season.set(self.seasons[0])
-
+        # Initialize team dropdown but do not populate it yet
+        self.selected_team = StringVar(self.window)
+        self.teams = self.fetch_teams(self.selected_season.get())  # Fetch teams for the selected season
+        self.selected_team.set(self.teams[0])  # Set the default team
         self.team_dropdown = OptionMenu(self.window, self.selected_team, *self.teams, command=self.update_team_stats)
-        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.update_team_stats)
+        self.team_dropdown.place(x=800, y=100)
 
-        self.team_dropdown.place(x=400, y=100)
-        self.season_dropdown.place(x=800, y=100)
+        # Normal Button
+        self.normal_button = Button(self.window, text="Normal", fg='#340040', bg='#F2055C', command=self.on_normal_button_pressed)
+        self.normal_button.place(x=400, y=150)
+
+        # Graph Button
+        self.graph_button = Button(self.window, text="Graph", fg='#340040', bg='white', command=self.on_graph_button_pressed)
+        self.graph_button.place(x=400, y=200)
+        
+        
 
         # Labels for Statistics
         self.stat_labels = {
@@ -152,12 +156,52 @@ class Dashboard2:
         # Initially populate stats for the default team and season
         self.update_team_stats()
 
-    def fetch_teams(self):
-        # Function to fetch available teams from the database for both seasons
+    def on_season_select(self, initial=False):
+        season = self.selected_season.get()
+        teams = self.fetch_teams(season)
+
+        if initial:
+            default_team = 'Arsenal FC' if season == '2021' else 'AFC Bournemouth'
+            self.selected_team.set(default_team)
+        elif teams:
+            # On user-triggered year change, select the first team in the list
+            self.selected_team.set(teams[0])
+
+        if teams:
+            self.team_dropdown['menu'].delete(0, 'end')
+            for team in teams:
+                self.team_dropdown['menu'].add_command(label=team, command=lambda value=team: self.update_team_selection(value))
+
+        # Update stats after setting the default team
+        self.update_team_stats()
+
+    
+    def update_team_selection(self, team):
+        self.selected_team.set(team)
+        self.update_team_stats()
+    
+    def on_normal_button_pressed(self):
+        # Change button colors to indicate selection
+        self.normal_button.config(bg='#F2055C')
+        self.graph_button.config(bg='white')
+        # Handle any additional functionality for the Normal view
+        self.show_teams_page()
+       
+
+    def on_graph_button_pressed(self):
+        # Change button colors to indicate selection
+        self.normal_button.config(bg='white')
+        self.graph_button.config(bg='#F2055C')
+        # Open the new page for the Graph view
+        self.show_graph_page()
+
+
+
+
+    def fetch_teams(self, season):
         mydb = get_db_connection()
         mycursor = mydb.cursor()
-        # Fetch teams from both seasons, this assumes the team names are the same across both tables
-        query = "SELECT DISTINCT team_name FROM teams2021 UNION SELECT DISTINCT team_name FROM teams2022 ORDER BY team_name"
+        query = f"SELECT DISTINCT team_name FROM teams{season} ORDER BY team_name"
         mycursor.execute(query)
         result = mycursor.fetchall()
         teams = [team[0] for team in result]
@@ -166,11 +210,14 @@ class Dashboard2:
         return teams
 
     def update_team_stats(self, *args):
+        # Get the selected team and season
         team = self.selected_team.get()
         season = self.selected_season.get()
+
+        # Fetch and display the statistics for the selected team and season
         stats = self.get_team_stats_from_db(team, season)
         for stat_name, var in self.stat_labels.items():
-            var.set(stats.get(stat_name, 'N/A'))  # Use 'N/A' if the stat is not found
+            var.set(stats.get(stat_name, 'N/A')) # Use 'N/A' if the stat is not found
 
     def get_team_stats_from_db(self, team, season):
         table_name = f"teams{season}"
@@ -196,7 +243,125 @@ class Dashboard2:
             }
         else:
             return {stat: 'N/A' for stat in self.stat_labels}
+    def fetch_column_names(self, season):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        query = f"SHOW COLUMNS FROM teams{season}"
+        mycursor.execute(query)
+        # Replace underscores with spaces in the column names
+        columns = [column[0].replace('_', ' ') for column in mycursor.fetchall()
+                if column[0].lower() not in ('id', 'team_name', 'common_name', 'season', 'country', 'suspended_matches')]
+        mycursor.close()
+        mydb.close()
+        return columns
+
         
+    def show_graph_page(self):
+        self.clear_window()
+
+        # Heading
+        self.heading = Label(self.window, text='Teams', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
+        self.heading.place(x=325, y=70)
+        
+        # Team and Season Selection
+        # Season Dropdown
+        self.selected_season = StringVar(self.window)
+        self.seasons = ['2021', '2022']
+        self.selected_season.set('2021')
+        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.on_season_select)
+        self.season_dropdown.place(x=400, y=100)
+
+    
+
+        self.column_names = self.fetch_column_names('2021')
+
+        self.selected_column = StringVar(self.window)
+        self.selected_column.set(self.column_names[0])  # set default value
+        self.column_dropdown = OptionMenu(self.window, self.selected_column, *self.column_names)
+        self.column_dropdown.place(x=1200, y=100)
+
+        # Normal Button
+        self.normal_button = Button(self.window, text="Normal", fg='#340040', bg='white', command=self.on_normal_button_pressed)
+        self.normal_button.place(x=400, y=150)
+
+        # Graph Button
+        self.graph_button = Button(self.window, text="Graph", fg='#340040', bg='#F2055C', command=self.on_graph_button_pressed)
+        self.graph_button.place(x=400, y=200)
+
+        self.generate_graph_button = Button(self.window, text="Generate Graph", fg='#340040', command=self.generate_graph)
+        self.generate_graph_button.place(x=1200, y=150)
+        self.on_season_select(initial=True)
+
+
+    def generate_graph(self):
+        # Fetch the data for the selected column and season
+        column = self.selected_column.get().replace('_', ' ')  # Replace underscores with spaces
+        season = self.selected_season.get()
+        data = self.fetch_data_for_graph(column.replace(' ', '_'), season)  # Replace spaces back to underscore for SQL query
+
+        # Sort the data by the second item in the tuple (which is assumed to be the value)
+        data.sort(key=lambda x: x[1], reverse=True)
+
+        # Now generate the bar chart
+
+        teams = [item[0] for item in data]
+        values = [item[1] for item in data]
+
+        # Create the bar chart
+        fig, ax = plt.subplots(figsize=(8, 6))  # Adjust the figure size as needed
+        bars = ax.barh(teams, values, color='skyblue')
+        ax.set_xlabel('Values')
+        ax.set_title(f'{column} for Season {season}')
+
+        # Set the background color
+        fig.patch.set_facecolor('#38003c')  # Set the outer background color
+        ax.set_facecolor('#38003c')  # Set the inner background color
+
+        # Set the color of the text and labels to contrast against the dark background
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.title.set_color('white')
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+
+        # Adjust the margins
+        plt.subplots_adjust(left=0.3)  # Adjust this value as needed to fit the team names
+
+        # Add the values on the bars and adjust their position based on the bar length
+        for bar in bars:
+            width = bar.get_width()
+            bar_height = bar.get_height()
+            y = bar.get_y() + bar_height / 2
+            if width != 0:
+                ax.text(width / 2, y, f'{width}', ha='center', va='center', color='black')
+
+        ax.tick_params(axis='y', labelsize=8) 
+        canvas = FigureCanvasTkAgg(fig, master=self.window)
+        canvas.draw()
+        canvas.get_tk_widget().place(x=400, y=105)
+
+        self.season_dropdown.place(x=400, y=100)
+        self.column_dropdown.place(x=1200, y=100)
+        self.normal_button.place(x=400, y=150)
+        self.graph_button.place(x=400, y=200)
+        self.generate_graph_button.place(x=1200, y=150)
+
+        self.season_dropdown.lift()
+        self.column_dropdown.lift()
+        self.normal_button.lift()
+        self.graph_button.lift()
+        self.generate_graph_button.lift()
+
+    def fetch_data_for_graph(self, column, season):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        query = f"SELECT team_name, {column} FROM teams{season}"
+        mycursor.execute(query)
+        result = mycursor.fetchall()
+        mycursor.close()
+        mydb.close()
+        return result
+
 
     
 
@@ -355,10 +520,7 @@ class Dashboard2:
 
 
 
-    def show_injuries_page(self):
-        self.clear_window()
-        self.heading = Label(self.window, text='Injuries', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
-        self.heading.place(x=325, y=70)
+   
 
 def wind():
     window = Tk()
