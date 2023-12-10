@@ -123,12 +123,16 @@ class Dashboard2:
         self.team_dropdown.place(x=800, y=100)
 
         # Normal Button
-        self.normal_button = Button(self.window, text="Normal", fg='#340040', bg='#F2055C', command=self.on_normal_button_pressed)
-        self.normal_button.place(x=400, y=150)
+        self.normal_button = Button(self.window, text="Normal", fg='#F2055C', bg='#38003c', bd=0,
+                                cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                                command=self.on_normal_button_pressed)
+        self.normal_button.place(x=400, y=200)
 
         # Graph Button
-        self.graph_button = Button(self.window, text="Graph", fg='#340040', bg='white', command=self.on_graph_button_pressed)
-        self.graph_button.place(x=400, y=200)
+        self.graph_button = Button(self.window, text="Graph", fg='#ffffff', bg='#38003c', bd=0,
+                               cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                               command=self.on_graph_button_pressed)
+        self.graph_button.place(x=400, y=280)
         
         
 
@@ -255,6 +259,7 @@ class Dashboard2:
         mydb.close()
         return columns
 
+    
         
     def show_graph_page(self):
         self.clear_window()
@@ -280,13 +285,22 @@ class Dashboard2:
         self.column_dropdown = OptionMenu(self.window, self.selected_column, *self.column_names)
         self.column_dropdown.place(x=1200, y=100)
 
-        # Normal Button
-        self.normal_button = Button(self.window, text="Normal", fg='#340040', bg='white', command=self.on_normal_button_pressed)
-        self.normal_button.place(x=400, y=150)
+        self.graph_type_var = StringVar(self.window)
+        self.graph_types = ['Vertical Bar', 'Horizontal Bar', 'Scatter Plot']
+        self.graph_type_var.set(self.graph_types[0]) 
+        self.graph_type_dropdown = OptionMenu(self.window, self.graph_type_var, *self.graph_types)
+        self.graph_type_dropdown.place(x=1050, y=100)
+
+        self.normal_button = Button(self.window, text="Normal", fg='#ffffff', bg='#38003c', bd=0,
+                                cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                                command=self.on_normal_button_pressed)
+        self.normal_button.place(x=400, y=200)
 
         # Graph Button
-        self.graph_button = Button(self.window, text="Graph", fg='#340040', bg='#F2055C', command=self.on_graph_button_pressed)
-        self.graph_button.place(x=400, y=200)
+        self.graph_button = Button(self.window, text="Graph", fg='#F2055C', bg='#38003c', bd=0,
+                               cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                               command=self.on_graph_button_pressed)
+        self.graph_button.place(x=400, y=280)
 
         self.generate_graph_button = Button(self.window, text="Generate Graph", fg='#340040', command=self.generate_graph)
         self.generate_graph_button.place(x=1200, y=150)
@@ -294,60 +308,123 @@ class Dashboard2:
 
 
     def generate_graph(self):
-        # Fetch the data for the selected column and season
-        column = self.selected_column.get().replace('_', ' ')  # Replace underscores with spaces
+        column = self.selected_column.get().replace('_', ' ')
         season = self.selected_season.get()
-        data = self.fetch_data_for_graph(column.replace(' ', '_'), season)  # Replace spaces back to underscore for SQL query
+        graph_type = self.graph_type_var.get()
+        data = self.fetch_data_for_graph(column.replace(' ', '_'), season)
 
-        # Sort the data by the second item in the tuple (which is assumed to be the value)
         data.sort(key=lambda x: x[1], reverse=True)
-
-        # Now generate the bar chart
-
         teams = [item[0] for item in data]
         values = [item[1] for item in data]
+        team_colors = {
+            'Arsenal FC': '#EF0107',
+            'Aston Villa FC': '#670E36',
+            'Brentford FC': '#FF0000',
+            'Brighton & Hove Albion FC': '#0057B8',
+            'Burnley FC': '#6C1D45',
+            'Chelsea FC': '#034694',
+            'Crystal Palace FC': '#C4122E',  # Primary color Red
+            'Everton FC': '#003399',
+            'Fulham FC': '#FFFFFF',
+            'Leeds United FC': '#FFFFFF',
+            'Leicester City FC': '#003090',
+            'Liverpool FC': '#C8102E',
+            'Manchester City FC': '#6CABDD',
+            'Manchester United FC': '#DA291C',
+            'Newcastle United FC': '#241F20',  # Primary color Black
+            'Norwich City FC': '#FFF200',  # Primary color Yellow
+            'Southampton FC': '#D71920',  # Primary color Red
+            'Tottenham Hotspur FC': '#FFFFFF',
+            'Watford FC': '#FBEE23',
+            'West Ham United FC': '#7A263A',  # Primary color Claret
+            'Wolverhampton Wanderers FC': '#FDB913',
+            'AFC Bournemouth FC': '#DA291C',  # Primary color Red
+            'Nottingham Forest FC': '#D50000',
+        }
 
-        # Create the bar chart
-        fig, ax = plt.subplots(figsize=(8, 6))  # Adjust the figure size as needed
-        bars = ax.barh(teams, values, color='skyblue')
+        team_abbreviations = {
+            'Arsenal FC': 'ARS',
+            'Aston Villa FC': 'AVL',
+            'Brentford FC': 'BRE',
+            'Brighton & Hove Albion FC': 'BHA',
+            'Burnley FC': 'BUR',
+            'Chelsea FC': 'CHE',
+            'Crystal Palace FC': 'CRY',
+            'Everton FC': 'EVE',
+            'Fulham FC': 'FUL',
+            'Leeds United FC': 'LEE',
+            'Leicester City FC': 'LEI',
+            'Liverpool FC': 'LIV',
+            'Manchester City FC': 'MCI',
+            'Manchester United FC': 'MUN',
+            'Newcastle United FC': 'NEW',
+            'Norwich City FC': 'NOR',
+            'Southampton FC': 'SOU',
+            'Tottenham Hotspur FC': 'TOT',
+            'Watford FC': 'WAT',
+            'West Ham United FC': 'WHU',
+            'Wolverhampton Wanderers FC': 'WOL',
+            'AFC Bournemouth FC': 'BOU',
+            'Nottingham Forest FC': 'NFO',
+        }
+
+        abbreviated_teams = [team_abbreviations.get(team, 'UNK') for team in teams]  # UNK for Unknown
+
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        bar_colors = [team_colors.get(team, '#FFFFFF') for team in teams]
+
+        if graph_type == 'Horizontal Bar':
+            bars = ax.barh(teams, values, color=bar_colors)
+            for bar in bars:
+                width = bar.get_width()
+                label_x_pos = bar.get_x() + width / 2
+                ax.text(label_x_pos, bar.get_y() + bar.get_height() / 2, str(width), va='center', ha='center')
+
+        elif graph_type == 'Vertical Bar':
+            bars = ax.bar(range(len(abbreviated_teams)), values, color=bar_colors)
+            ax.set_xticks(range(len(abbreviated_teams)))
+            ax.set_xticklabels(abbreviated_teams, rotation=90)
+            for bar in bars:
+                height = bar.get_height()
+                label_y_pos = bar.get_y() + height / 2
+                ax.text(bar.get_x() + bar.get_width() / 2, label_y_pos, str(height), va='center', ha='center')
+
+        elif graph_type == 'Scatter Plot':
+            for i, (abbr, value) in enumerate(zip(abbreviated_teams, values)):
+                ax.scatter(i, value, color=team_colors.get(teams[i], '#FFFFFF'))
+                ax.text(i, value, abbr, ha='center', va='bottom', fontsize=8, rotation=45, color='white')
+
+        
+
+
+        # Common graph settings
         ax.set_xlabel('Values')
         ax.set_title(f'{column} for Season {season}')
-
-        # Set the background color
-        fig.patch.set_facecolor('#38003c')  # Set the outer background color
-        ax.set_facecolor('#38003c')  # Set the inner background color
-
-        # Set the color of the text and labels to contrast against the dark background
+        ax.set_facecolor('#38003c')
+        fig.patch.set_facecolor('#38003c')
         ax.xaxis.label.set_color('white')
         ax.yaxis.label.set_color('white')
         ax.title.set_color('white')
         ax.tick_params(axis='x', colors='white')
         ax.tick_params(axis='y', colors='white')
+        plt.subplots_adjust(left=0.3 if graph_type == 'Horizontal Bar' else 0.1)
 
-        # Adjust the margins
-        plt.subplots_adjust(left=0.3)  # Adjust this value as needed to fit the team names
-
-        # Add the values on the bars and adjust their position based on the bar length
-        for bar in bars:
-            width = bar.get_width()
-            bar_height = bar.get_height()
-            y = bar.get_y() + bar_height / 2
-            if width != 0:
-                ax.text(width / 2, y, f'{width}', ha='center', va='center', color='black')
-
-        ax.tick_params(axis='y', labelsize=8) 
+        # Embedding the graph in the Tkinter window
         canvas = FigureCanvasTkAgg(fig, master=self.window)
         canvas.draw()
-        canvas.get_tk_widget().place(x=400, y=105)
+        canvas.get_tk_widget().place(x=470, y=105)
 
         self.season_dropdown.place(x=400, y=100)
         self.column_dropdown.place(x=1200, y=100)
-        self.normal_button.place(x=400, y=150)
-        self.graph_button.place(x=400, y=200)
+        self.normal_button.place(x=400, y=200)
+        self.graph_button.place(x=400, y=280)
         self.generate_graph_button.place(x=1200, y=150)
+        self.graph_type_dropdown.place(x=1050, y=100)
 
         self.season_dropdown.lift()
         self.column_dropdown.lift()
+        self.graph_type_dropdown.lift()
         self.normal_button.lift()
         self.graph_button.lift()
         self.generate_graph_button.lift()
@@ -361,6 +438,8 @@ class Dashboard2:
         mycursor.close()
         mydb.close()
         return result
+    
+    
 
 
     
