@@ -463,7 +463,7 @@ class Dashboard2:
         label_value_spacing = 500 
 
         pl_logo = Image.open('images/pl_logo.png')  
-        pl_logo = pl_logo.resize((350, 300), Image.ANTIALIAS)  # Resize the image if needed and preserve aspect ratio
+        pl_logo = pl_logo.resize((350, 300))  # Resize the image if needed and preserve aspect ratio
         pl_logo = ImageTk.PhotoImage(pl_logo)
 
         pl_logo_label = Label(self.window, image=pl_logo, bg='#38003c')
@@ -603,6 +603,7 @@ class Dashboard2:
 
 def wind():
     window = Tk()
+    window.state('zoomed')
     Dashboard2(window)
     window.mainloop()
 
