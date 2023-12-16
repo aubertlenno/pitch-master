@@ -8,6 +8,8 @@ from tkinter import messagebox
 import register
 import re
 
+from Dash import Dashboard2
+
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r"assets\frame0")
@@ -50,8 +52,10 @@ def on_signin_clicked():
             stored_password = result[0]
             # Compare entered password with the hashed password
             if stored_password == hashed_password:
-                messagebox.showinfo("Login Success", "You are successfully logged in.")
-                # Proceed to next part of your application
+                window.destroy()
+                dashboard_root = Tk()
+                app = Dashboard2(dashboard_root)  # Instantiate the dashboard
+                dashboard_root.mainloop()  # Run the dashboard app
             else:
                 messagebox.showerror("Login Error", "Incorrect password")
 
