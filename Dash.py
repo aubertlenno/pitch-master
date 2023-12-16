@@ -1436,17 +1436,6 @@ class Dashboard2:
 
         self.update_load_team_dropdown()  
 
-
-
-
-
-
-
-
-
-
-   
-
 def wind():
     window = Tk()
     Dashboard2(window)
