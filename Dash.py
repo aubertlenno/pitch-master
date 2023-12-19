@@ -9,6 +9,8 @@ import customtkinter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import messagebox
+import seaborn as sns
+import numpy as np
 
 
 
@@ -16,6 +18,33 @@ mydb = get_db_connection()
 mycursor = mydb.cursor()
 
 class Dashboard2:
+
+    team_abbreviations = {
+        'Arsenal': 'ARS',
+        'Aston Villa': 'AVL',
+        'Brentford': 'BRE',
+        'Brighton & Hove Albion': 'BHA',
+        'Burnley': 'BUR',
+        'Chelsea': 'CHE',
+        'Crystal Palace': 'CRY',
+        'Everton': 'EVE',
+        'Fulham': 'FUL',
+        'Leeds United': 'LEE',
+        'Leicester City': 'LEI',
+        'Liverpool': 'LIV',
+        'Manchester City': 'MCI',
+        'Manchester United': 'MUN',
+        'Newcastle United': 'NEW',
+        'Norwich City': 'NOR',
+        'Southampton': 'SOU',
+        'Tottenham Hotspur': 'TOT',
+        'Watford': 'WAT',
+        'West Ham United': 'WHU',
+        'Wolverhampton Wanderers': 'WOL',
+        'AFC Bournemouth': 'BOU',
+        'Nottingham Forest': 'NFO'
+    }
+
     def __init__(self, window):
         self.window = window
         self.window.title("System Management Dashboard")
@@ -573,6 +602,68 @@ class Dashboard2:
         show_stats_btn = Button(self.window, text="Show Match Stats", command=self.display_match_stats)
         show_stats_btn.place(x=1000, y=100)  # Adjust positioning as needed
 
+        self.normal_button = Button(self.window, text="Normal", fg='#F2055C', bg='#38003c', bd=0,
+                                cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                                command=self.on_normal_button_pressed_matches)
+        self.normal_button.place(x=800, y=50)
+
+        # Graph Button
+        self.graph_button = Button(self.window, text="Graph", fg='#ffffff', bg='#38003c', bd=0,
+                               cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                               command=self.on_graph_button_pressed_matches)
+        self.graph_button.place(x=1000, y=50)
+
+    def on_normal_button_pressed_matches(self):
+        # Change button colors to indicate selection
+        self.normal_button.config(bg='#F2055C')
+        self.graph_button.config(bg='white')
+        # Handle any additional functionality for the Normal view
+        self.show_matches_page()
+       
+    def on_graph_button_pressed_matches(self):
+        # Change button colors to indicate selection
+        self.normal_button.config(bg='white')
+        self.graph_button.config(bg='#F2055C')
+        # Open the new page for the Graph view
+        self.show_graph_page_matches()
+
+    def show_graph_page_matches(self):
+        self.clear_window()
+
+        # Heading
+        self.heading = Label(self.window, text='Teams', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
+        self.heading.place(x=325, y=70)
+        
+        # Year Dropdown
+        self.selected_season = StringVar(self.window)
+        self.seasons = ['2021', '2022']
+        self.selected_season.set('2021')  # Default selection
+        self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.on_season_select_graph)
+        self.season_dropdown.place(x=400, y=100)
+
+        # Initially display the heatmap for the default year
+        self.update_heatmap(self.selected_season.get())
+
+        self.normal_button = Button(self.window, text="Normal", fg='#F2055C', bg='#38003c', bd=0,
+                                cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                                command=self.on_normal_button_pressed_matches)
+        self.normal_button.place(x=800, y=50)
+
+        # Graph Button
+        self.graph_button = Button(self.window, text="Graph", fg='#ffffff', bg='#38003c', bd=0,
+                               cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
+                               command=self.on_graph_button_pressed_matches)
+        self.graph_button.place(x=1000, y=50)
+
+    def on_season_select_graph(self, year):
+        # Update the heatmap when a different year is selected
+        self.update_heatmap(year)
+
+    def update_heatmap(self, year):
+        matches_data = self.fetch_matches_data_graph(year)
+        goals_data = self.process_goals_data(matches_data)
+        self.create_and_display_heatmap(goals_data)
+
     def on_year_select_matches(self, year):
         # Update the home team dropdown based on the selected year
         home_teams = self.fetch_home_teams(year)
@@ -652,13 +743,54 @@ class Dashboard2:
                 ]
 
                 for i, (stat, home_value, away_value) in enumerate(stats):
-                    Label(self.stats_frame, text=stat, font=("Helvetica", 15), background="#38003c", foreground="white").grid(row=i, column=1, padx=100, pady=5)
-                    Label(self.stats_frame, text=home_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=0, padx=50, pady=5)
-                    Label(self.stats_frame, text=away_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=2, padx=50, pady=5)
+                    Label(self.stats_frame, text=stat, font=("Helvetica", 15), background="#38003c", foreground="white").grid(row=i, column=1, padx=100, pady=10)
+                    Label(self.stats_frame, text=home_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=0, padx=50, pady=10)
+                    Label(self.stats_frame, text=away_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=2, padx=50, pady=10)
             else:
                 messagebox.showinfo("No Data", "No match data found for the selected teams.")
         else:
             messagebox.showinfo("Selection Required", "Please select both teams and a year.")
+
+    def fetch_matches_data_graph(self, year):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        query = f"SELECT home_team_name, away_team_name, home_team_goal_count, away_team_goal_count FROM matches{year}"
+        mycursor.execute(query)
+        matches = mycursor.fetchall()
+        mycursor.close()
+        mydb.close()
+        return matches
+    
+    def process_goals_data(self, matches):
+        goals_data = {}
+        for home_team, away_team, home_goals, away_goals in matches:
+            home_abbr = self.team_abbreviations.get(home_team, home_team)
+            away_abbr = self.team_abbreviations.get(away_team, away_team)
+
+            if home_abbr not in goals_data:
+                goals_data[home_abbr] = {}
+            if away_abbr not in goals_data:
+                goals_data[away_abbr] = {}
+
+            goals_data[home_abbr][away_abbr] = goals_data[home_abbr].get(away_abbr, 0) + home_goals
+            goals_data[away_abbr][home_abbr] = goals_data[away_abbr].get(home_abbr, 0) + away_goals
+
+        return goals_data
+    
+    def create_and_display_heatmap(self, data):
+        teams = sorted(data.keys())
+        goals_matrix = np.array([[data[team].get(opponent, 0) for opponent in teams] for team in teams])
+
+        fig, ax = plt.subplots(figsize=(4, 2))
+        sns.heatmap(goals_matrix, annot=True, fmt="d", cmap='coolwarm', xticklabels=teams, yticklabels=teams, ax=ax)
+        ax.set_title("Goals Scored Against Each Team")
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=45)
+
+        # Embedding the heatmap in Tkinter
+        canvas = FigureCanvasTkAgg(fig, master=self.window)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.place(x=400, y=150, width=800, height=600)
 ##################################################################################
 
     def show_league_page(self):
