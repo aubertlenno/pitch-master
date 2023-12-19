@@ -532,7 +532,7 @@ class Dashboard2:
         if player_stats:
             # Display new stats in the scrollable frame
             for i, (key, value) in enumerate(player_stats.items()):
-                Label(self.scrollable_frame, text=f"{key.replace('_', ' ').title()}: {value}", bg='#38003c', fg='white').grid(row=i, column=0, sticky="w", padx=10, pady=5)
+                Label(self.scrollable_frame, text=f"{key.replace('_', ' ').title()}: {value}", bg='#38003c', fg='white', font=("Helvetica", 14), borderwidth=0).grid(row=i, column=0, sticky="w", padx=10, pady=8)
 
     def fetch_players_for_team(self, year, team):
         mydb = get_db_connection()
@@ -556,20 +556,20 @@ class Dashboard2:
     
     def create_scrollable_stat_area(self):
         # Create a canvas and a scrollbar
-        self.stats_canvas = Canvas(self.window, bg='#38003c')
+        self.stats_canvas = Canvas(self.window, bg='#38003c', highlightthickness=0)
         self.stats_scrollbar = Scrollbar(self.window, orient="vertical", command=self.stats_canvas.yview)
         self.scrollable_frame = Frame(self.stats_canvas, bg='#38003c')
 
         # Add the scrollable frame to the canvas
         self.stats_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.stats_canvas.configure(yscrollcommand=self.stats_scrollbar.set)
+        self.stats_canvas.configure(yscrollcommand=self.stats_scrollbar.set, borderwidth=0)
 
         # Bind the configuration event to update the scroll region
         self.scrollable_frame.bind("<Configure>", lambda e: self.stats_canvas.configure(scrollregion=self.stats_canvas.bbox("all")))
 
         # Place the canvas and scrollbar in the window
         self.stats_canvas.place(x=400, y=200, width=560, height=500)  # Adjust size and position as needed
-        self.stats_scrollbar.place(x=960, y=200, height=500)  # Adjust to align with the canvas
+        self.stats_scrollbar.place(x=1100, y=200, height=500)  # Adjust to align with the canvas
 
     def show_matches_page(self):
         self.clear_window()
@@ -906,8 +906,6 @@ class Dashboard2:
             return {key: stats_row[key.replace(' ', '_').lower()] for key in self.stat_labels}
         else:
             return {key: "N/A" for key in self.stat_labels}  # Return "N/A" if no data is found
-
-# Rest of your Tkinter setup and main loop
 
     def get_stats_from_db(self, year):
         table_name = f"league{year}"  # Construct the table name based on the year
