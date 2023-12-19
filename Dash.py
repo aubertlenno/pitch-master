@@ -315,20 +315,20 @@ class Dashboard2:
         self.seasons = ['2021', '2022']
         self.selected_season.set('2021')
         self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.on_season_select)
-        self.season_dropdown.place(x=400, y=100)
+        self.season_dropdown.place(x=400, y=120)
 
         self.column_names = self.fetch_column_names('2021')
 
         self.selected_column = StringVar(self.window)
         self.selected_column.set(self.column_names[0])  # set default value
         self.column_dropdown = OptionMenu(self.window, self.selected_column, *self.column_names)
-        self.column_dropdown.place(x=1200, y=100)
+        self.column_dropdown.place(x=1050, y=120)
 
         self.graph_type_var = StringVar(self.window)
         self.graph_types = ['Vertical Bar', 'Horizontal Bar', 'Scatter Plot']
         self.graph_type_var.set(self.graph_types[0]) 
         self.graph_type_dropdown = OptionMenu(self.window, self.graph_type_var, *self.graph_types)
-        self.graph_type_dropdown.place(x=1050, y=100)
+        self.graph_type_dropdown.place(x=900, y=120)
 
         self.normal_button = Button(self.window, text="Normal", fg='#ffffff', bg='#38003c', bd=0,
                                 cursor='hand2', activebackground='#38003c', font=("", 18, "bold"), 
@@ -342,7 +342,7 @@ class Dashboard2:
         self.graph_button.place(x=400, y=280)
 
         self.generate_graph_button = Button(self.window, text="Generate Graph", fg='#340040', command=self.generate_graph)
-        self.generate_graph_button.place(x=1200, y=150)
+        self.generate_graph_button.place(x=1050, y=170)
         self.on_season_select(initial=True)
 
     def generate_graph(self):
@@ -477,99 +477,172 @@ class Dashboard2:
         self.heading = Label(self.window, text='Players', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
         self.heading.place(x=325, y=70)
 
-        self.selected_year = StringVar(self.window)
-        self.years = ['2021', '2022']  # Update this list as needed
-        self.selected_year.set('2021')  # Set default year to 2021
-        self.year_dropdown = OptionMenu(self.window, self.selected_year, *self.years, command=self.on_year_select)
-        self.year_dropdown.place(x=400, y=100)  # Adjust position as needed
+        # Year Dropdown
+        self.selected_year_players = StringVar(self.window)
+        self.selected_year_players.set('Select Year')
+        self.year_dropdown_players = OptionMenu(self.window, self.selected_year_players, '2021', '2022', command=self.on_year_select_players)
+        self.year_dropdown_players.place(x=400, y=120)
 
-        # Initialize empty dropdowns for team and player, to be populated later
-        self.selected_team = StringVar(self.window)
-        self.team_dropdown = OptionMenu(self.window, self.selected_team, '')
-        self.team_dropdown.place(x=480, y=100)  # Adjust position as needed
+        # Team Dropdown (populated in on_year_select_players)
+        self.selected_team_players = StringVar(self.window)
+        self.team_dropdown_players = OptionMenu(self.window, self.selected_team_players, '')
+        self.team_dropdown_players.place(x=600, y=120)
 
-        self.selected_player = StringVar(self.window)
-        self.player_dropdown = OptionMenu(self.window, self.selected_player, '')
-        self.player_dropdown.place(x=685, y=100)  # Adjust position as needed
+        # Position Dropdown (populated in update_team_dropdown)
+        self.selected_position_players = StringVar(self.window)
+        self.position_dropdown_players = OptionMenu(self.window, self.selected_position_players, '')
+        self.position_dropdown_players.place(x=800, y=120)
 
-        self.on_year_select('2021')
-        self.create_scrollable_stat_area()
+        # Player Dropdown (populated in update_position_dropdown)
+        self.selected_player_players = StringVar(self.window)
+        self.player_dropdown_players = OptionMenu(self.window, self.selected_player_players, '')
+        self.player_dropdown_players.place(x=1000, y=120)
 
-    def on_year_select(self, selected_year):
-        teams = self.fetch_teams_for_year(selected_year)
-        self.selected_team.set(teams[0] if teams else '')  # Set the first team as default
-        self.team_dropdown['menu'].delete(0, 'end')
+        # Scrollable area for player data
+        self.player_data_frame = Frame(self.window, bg='#38003c')
+        self.player_data_canvas = Canvas(self.player_data_frame)
+        self.player_data_scrollbar = Scrollbar(self.player_data_frame, orient="vertical", command=self.player_data_canvas.yview)
+        self.scrollable_player_data_frame = Frame(self.player_data_canvas, bg='#38003c')
+
+        self.scrollable_player_data_frame.bind(
+            "<Configure>",
+            lambda e: self.player_data_canvas.configure(
+                scrollregion=self.player_data_canvas.bbox("all")
+            )
+        )
+
+        self.player_data_canvas.create_window((0, 0), window=self.scrollable_player_data_frame, anchor="nw")
+        self.player_data_canvas.configure(yscrollcommand=self.player_data_scrollbar.set, bg='#38003c', highlightthickness=0)
+
+        self.player_data_frame.place(x=350, y=200, width=800, height=400)
+        self.player_data_canvas.pack(side="left", fill="both", expand=True)
+        self.player_data_scrollbar.pack(side="right", fill="y")
+
+        # Bind dropdown updates
+        self.selected_year_players.trace('w', self.update_team_dropdown_players)
+        self.selected_team_players.trace('w', self.update_position_dropdown_players)
+        self.selected_position_players.trace('w', self.update_player_dropdown_players)
+        self.selected_player_players.trace('w', self.display_player_data)
+
+    def on_year_select_players(self, year):
+        # Update team dropdown based on the selected year
+        teams = self.fetch_teams_for_year(year)
+        menu = self.team_dropdown_players['menu']
+        menu.delete(0, 'end')
         for team in teams:
-            self.team_dropdown['menu'].add_command(label=team, command=lambda value=team: self.update_team_selection(value))
-        self.update_team_selection(teams[0] if teams else '')  # Update player dropdown
-    
-    def fetch_teams_for_year(self, year):
-        mydb = get_db_connection()
-        mycursor = mydb.cursor()
-        query = f"SELECT DISTINCT current_club FROM players{year}"
-        mycursor.execute(query)
-        teams = [team[0] for team in mycursor.fetchall()]
-        mycursor.close()
-        mydb.close()
-        return teams
-    
-    def update_team_selection(self, team):
-        self.selected_team.set(team)
-        players = self.fetch_players_for_team(self.selected_year.get(), team)
-        self.selected_player.set(players[0] if players else '')  # Set the first player as default
-        self.player_dropdown['menu'].delete(0, 'end')
-        for player in players:
-            self.player_dropdown['menu'].add_command(label=player, command=lambda value=player: self.display_player_stats(value))
+            menu.add_command(label=team, command=lambda value=team: self.selected_team_players.set(value))
+        self.selected_team_players.set('Select Team')
 
-    def display_player_stats(self, player_name):
-        self.selected_player.set(player_name)
-        player_stats = self.fetch_player_stats(player_name, self.selected_year.get())
+    def update_team_dropdown_players(self, *args):
+        # Update position dropdown when a team is selected
+        positions = ["Forward", "Midfielder", "Defender", "Goalkeeper"]
+        menu = self.position_dropdown_players['menu']
+        menu.delete(0, 'end')
+        for position in positions:
+            menu.add_command(label=position, command=lambda value=position: self.selected_position_players.set(value))
+        self.selected_position_players.set('Select Position')
 
-        # Clear previous stats
-        for widget in self.scrollable_frame.winfo_children():
+    def update_position_dropdown_players(self, *args):
+        # Update player dropdown when a position is selected
+        team = self.selected_team_players.get()
+        position = self.selected_position_players.get()
+        year = self.selected_year_players.get()
+        if team != 'Select Team' and position != 'Select Position':
+            players = self.fetch_players_for_team_position(team, position, year)
+            menu = self.player_dropdown_players['menu']
+            menu.delete(0, 'end')
+            for player in players:
+                menu.add_command(label=player, command=lambda value=player: self.selected_player_players.set(value))
+            self.selected_player_players.set('Select Player')
+
+    def update_player_dropdown_players(self, *args):
+        team = self.selected_team_players.get()
+        position = self.selected_position_players.get()
+        year = self.selected_year_players.get()
+        if team != 'Select Team' and position != 'Select Position':
+            players = self.fetch_players_for_team_position(team, position, year)
+            menu = self.player_dropdown_players['menu']
+            menu.delete(0, 'end')
+            for player in players:
+                menu.add_command(label=player, command=lambda value=player: self.selected_player_players.set(value))
+            self.selected_player_players.set('Select Player')
+
+    def display_player_data(self, *args):
+        # Clear previous data
+        for widget in self.scrollable_player_data_frame.winfo_children():
             widget.destroy()
 
-        if player_stats:
-            # Display new stats in the scrollable frame
-            for i, (key, value) in enumerate(player_stats.items()):
-                Label(self.scrollable_frame, text=f"{key.replace('_', ' ').title()}: {value}", bg='#38003c', fg='white', font=("Helvetica", 14), borderwidth=0).grid(row=i, column=0, sticky="w", padx=10, pady=8)
+        player_name = self.selected_player_players.get()
+        team = self.selected_team_players.get()
+        year = self.selected_year_players.get()
+        if player_name != 'Select Player':
+            player_data = self.fetch_player_data(player_name, team, year)
+            if player_data:
+                # Format and display each data point in a structured layout
+                for i, (key, value) in enumerate(player_data.items()):
+                    formatted_key = key.replace('_', ' ').title()  # Format key for display
+                    Label(self.scrollable_player_data_frame, text=formatted_key, font=("Helvetica", 14, "bold"), bg='#38003c', fg='#ffffff').grid(row=i, column=0, sticky='w', padx=100, pady=7)
+                    Label(self.scrollable_player_data_frame, text=value, font=("Helvetica", 14), bg='#38003c', fg='#ffffff').grid(row=i, column=1, sticky='w', padx=100, pady=7)
+            else:
+                messagebox.showinfo("No Data", "Data not found for the selected player.")
 
-    def fetch_players_for_team(self, year, team):
-        mydb = get_db_connection()
-        mycursor = mydb.cursor()
-        query = f"SELECT full_name FROM players{year} WHERE current_club = %s"
-        mycursor.execute(query, (team,))
-        players = [player[0] for player in mycursor.fetchall()]
-        mycursor.close()
-        mydb.close()
+    def fetch_teams_for_year(self, year):
+        table_name = f"players{year}"
+        try:
+            mydb = get_db_connection()  # Make sure this function is defined to connect to your database
+            mycursor = mydb.cursor()
+            query = f"SELECT DISTINCT current_club FROM {table_name} ORDER BY current_club"
+            mycursor.execute(query)
+            teams = [team[0] for team in mycursor.fetchall()]
+        except Exception as e:
+            print(f"Error fetching teams: {e}")
+            teams = []
+        finally:
+            mycursor.close()
+            mydb.close()
+        return teams
+
+    def fetch_players_for_team_position(self, team, position, year):
+        table_name = f"players{year}"
+        try:
+            mydb = get_db_connection()
+            mycursor = mydb.cursor()
+            # Adjust the query to match the exact column name for position in your database
+            query = f"SELECT full_name FROM {table_name} WHERE current_club = %s AND position = %s ORDER BY full_name"
+            mycursor.execute(query, (team, position))
+            players = [player[0] for player in mycursor.fetchall()]
+        except Exception as e:
+            print(f"Error fetching players: {e}")
+            players = []
+        finally:
+            mycursor.close()
+            mydb.close()
         return players
     
-    def fetch_player_stats(self, player_name, year):
-        mydb = get_db_connection()
-        mycursor = mydb.cursor(dictionary=True)
-        query = f"SELECT * FROM players{year} WHERE full_name = %s"
-        mycursor.execute(query, (player_name,))
-        player_stats = mycursor.fetchone()
-        mycursor.close()
-        mydb.close()
-        return player_stats
-    
-    def create_scrollable_stat_area(self):
-        # Create a canvas and a scrollbar
-        self.stats_canvas = Canvas(self.window, bg='#38003c', highlightthickness=0)
-        self.stats_scrollbar = Scrollbar(self.window, orient="vertical", command=self.stats_canvas.yview)
-        self.scrollable_frame = Frame(self.stats_canvas, bg='#38003c')
-
-        # Add the scrollable frame to the canvas
-        self.stats_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.stats_canvas.configure(yscrollcommand=self.stats_scrollbar.set, borderwidth=0)
-
-        # Bind the configuration event to update the scroll region
-        self.scrollable_frame.bind("<Configure>", lambda e: self.stats_canvas.configure(scrollregion=self.stats_canvas.bbox("all")))
-
-        # Place the canvas and scrollbar in the window
-        self.stats_canvas.place(x=400, y=200, width=560, height=500)  # Adjust size and position as needed
-        self.stats_scrollbar.place(x=1100, y=200, height=500)  # Adjust to align with the canvas
+    def fetch_player_data(self, player_name, team, year):
+        table_name = f"players{year}"
+        try:
+            mydb = get_db_connection()
+            mycursor = mydb.cursor(dictionary=True)
+            query = f"""
+                SELECT nationality, appearances_overall, goals_overall, assists_overall, penalty_goals,
+                    penalty_misses, clean_sheets_overall, conceded_overall, yellow_cards_overall,
+                    red_cards_overall, goals_involved_per_90_overall, goals_per_90_overall, 
+                    conceded_per_90_overall, cards_per_90_overall, min_per_match, min_per_assist_overall,
+                    rank_in_league_top_attackers, rank_in_league_top_midfielders, rank_in_league_top_defenders, 
+                    rank_in_club_top_scorer
+                FROM {table_name}
+                WHERE full_name = %s AND current_club = %s
+            """
+            mycursor.execute(query, (player_name, team))
+            player_data = mycursor.fetchone()
+        except Exception as e:
+            print(f"Error fetching player data: {e}")
+            player_data = {}
+        finally:
+            mycursor.close()
+            mydb.close()
+        return player_data
 
     def show_matches_page(self):
         self.clear_window()
