@@ -188,7 +188,7 @@ class Dashboard2:
             # On user-triggered year change, select the first team in the list
             self.selected_team.set(teams[0])
 
-        if teams:
+        if teams and self.team_dropdown:
             self.team_dropdown['menu'].delete(0, 'end')
             for team in teams:
                 self.team_dropdown['menu'].add_command(label=team, command=lambda value=team: self.update_team_selection(value))
@@ -215,9 +215,6 @@ class Dashboard2:
         self.graph_button.config(bg='#F2055C')
         # Open the new page for the Graph view
         self.show_graph_page()
-
-
-
 
     def fetch_teams(self, season):
         mydb = get_db_connection()
@@ -276,9 +273,6 @@ class Dashboard2:
         mydb.close()
         return columns
         
-
-    
-        
     def show_graph_page(self):
         self.clear_window()
 
@@ -293,8 +287,6 @@ class Dashboard2:
         self.selected_season.set('2021')
         self.season_dropdown = OptionMenu(self.window, self.selected_season, *self.seasons, command=self.on_season_select)
         self.season_dropdown.place(x=400, y=100)
-
-    
 
         self.column_names = self.fetch_column_names('2021')
 
@@ -323,7 +315,6 @@ class Dashboard2:
         self.generate_graph_button = Button(self.window, text="Generate Graph", fg='#340040', command=self.generate_graph)
         self.generate_graph_button.place(x=1200, y=150)
         self.on_season_select(initial=True)
-
 
     def generate_graph(self):
         column = self.selected_column.get().replace('_', ' ')
@@ -500,15 +491,6 @@ class Dashboard2:
         self.player_dropdown['menu'].delete(0, 'end')
         for player in players:
             self.player_dropdown['menu'].add_command(label=player, command=lambda value=player: self.display_player_stats(value))
-    
-    def update_player_dropdown(self):
-        team = self.selected_team.get()
-        year = self.selected_year.get()
-        players = self.fetch_players_for_team(year, team)
-        self.selected_player.set('')  # Clear previous selection
-        self.player_dropdown['menu'].delete(0, 'end')
-        for player in players:
-            self.player_dropdown['menu'].add_command(label=player, command=lambda value=player: self.selected_player.set(value))
 
     def display_player_stats(self, player_name):
         self.selected_player.set(player_name)
@@ -560,11 +542,124 @@ class Dashboard2:
         self.stats_canvas.place(x=400, y=200, width=560, height=500)  # Adjust size and position as needed
         self.stats_scrollbar.place(x=960, y=200, height=500)  # Adjust to align with the canvas
 
-
     def show_matches_page(self):
         self.clear_window()
-        self.heading = Label(self.window, text='Matches', font=("", 15, "bold"), fg='#ffffff', bg='#38003c')
-        self.heading.place(x=325, y=70)
+
+        Label(self.window, text="HOME TEAM", font=("Helvetica", 18, "bold"), fg='aqua', bg='#38003c').place(x=400, y=200)
+        Label(self.window, text="AWAY TEAM", font=("Helvetica", 18, "bold"), fg='khaki2', bg='#38003c').place(x=1050, y=200)
+
+        # Year Dropdown
+        self.selected_year_matches = StringVar(self.window)
+        self.selected_year_matches.set('Select Year')
+        self.year_dropdown_matches = OptionMenu(self.window, self.selected_year_matches, '2021', '2022', command=self.on_year_select_matches)
+        self.year_dropdown_matches.place(x=400, y=100)
+
+        # Home Team Dropdown
+        self.selected_home_team = StringVar(self.window)
+        self.home_team_dropdown = OptionMenu(self.window, self.selected_home_team, '')
+        self.home_team_dropdown.place(x=600, y=100)
+        self.selected_home_team.trace('w', self.update_away_team_dropdown)
+
+        # Away Team Dropdown
+        self.selected_away_team = StringVar(self.window)
+        self.away_team_dropdown = OptionMenu(self.window, self.selected_away_team, '')
+        self.away_team_dropdown.place(x=800, y=100)
+
+        # Stats Frame
+        self.stats_frame = Frame(self.window, background="#38003c")
+        self.stats_frame.place(x=350, y=250)  # Adjust positioning as needed
+
+        # Button to display stats
+        show_stats_btn = Button(self.window, text="Show Match Stats", command=self.display_match_stats)
+        show_stats_btn.place(x=1000, y=100)  # Adjust positioning as needed
+
+    def on_year_select_matches(self, year):
+        # Update the home team dropdown based on the selected year
+        home_teams = self.fetch_home_teams(year)
+        menu = self.home_team_dropdown['menu']
+        menu.delete(0, 'end')
+        for team in home_teams:
+            menu.add_command(label=team, command=lambda value=team: self.selected_home_team.set(value))
+        self.selected_home_team.set('Select Home Team')
+
+    def fetch_home_teams(self, year):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        query = f"SELECT DISTINCT home_team_name FROM matches{year}"
+        mycursor.execute(query)
+        teams = [team[0] for team in mycursor.fetchall()]
+        mycursor.close()
+        mydb.close()
+        return teams
+
+    def update_away_team_dropdown(self, *args):
+        home_team = self.selected_home_team.get()
+        if home_team and home_team != 'Select Home Team':
+            year = self.selected_year_matches.get()
+            away_teams = self.fetch_away_teams(year, home_team)
+            menu = self.away_team_dropdown['menu']
+            menu.delete(0, 'end')
+            for team in away_teams:
+                menu.add_command(label=team, command=lambda value=team: self.selected_away_team.set(value))
+            self.selected_away_team.set('Select Away Team')
+        else:
+            # Clear away team dropdown if no home team is selected
+            self.away_team_dropdown['menu'].delete(0, 'end')
+            self.selected_away_team.set('')
+
+    def fetch_away_teams(self, year, home_team):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor()
+        query = f"SELECT DISTINCT away_team_name FROM matches{year} WHERE home_team_name = %s"
+        mycursor.execute(query, (home_team,))
+        teams = [team[0] for team in mycursor.fetchall()]
+        mycursor.close()
+        mydb.close()
+        return teams
+    
+    def fetch_match_data(self, year, home_team, away_team):
+        mydb = get_db_connection()
+        mycursor = mydb.cursor(dictionary=True)
+        query = f"SELECT * FROM matches{year} WHERE home_team_name = %s AND away_team_name = %s"
+        mycursor.execute(query, (home_team, away_team))
+        match_data = mycursor.fetchone()
+        mycursor.close()
+        mydb.close()
+        return match_data
+    
+    def display_match_stats(self):
+        year = self.selected_year_matches.get()
+        home_team = self.selected_home_team.get()
+        away_team = self.selected_away_team.get()
+
+        if home_team and away_team and year != 'Select Year':
+            match_data = self.fetch_match_data(year, home_team, away_team)
+            if match_data:
+                # Clear previous stats
+                for widget in self.stats_frame.winfo_children():
+                    widget.destroy()
+
+                # Display stats
+                stats = [
+                    ("Team Name", match_data["home_team_name"], match_data["away_team_name"]),
+                    ("Score", match_data["home_team_goal_count"], match_data["away_team_goal_count"]),
+                    ("Goal Time", match_data["home_team_goal_timings"], match_data["away_team_goal_timings"]),
+                    ("Possession", match_data["home_team_possession"], match_data["away_team_possession"]),
+                    ("Shots", match_data["home_team_shots"], match_data["away_team_shots"]),
+                    ("Corners", match_data["home_team_corner_count"], match_data["away_team_corner_count"]),
+                    ("Yellow Cards", match_data["home_team_yellow_cards"], match_data["away_team_yellow_cards"]),
+                    ("Red Cards", match_data["home_team_red_cards"], match_data["away_team_red_cards"]),
+                ]
+
+                for i, (stat, home_value, away_value) in enumerate(stats):
+                    Label(self.stats_frame, text=stat, font=("Helvetica", 15), background="#38003c", foreground="white").grid(row=i, column=1, padx=100, pady=5)
+                    Label(self.stats_frame, text=home_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=0, padx=50, pady=5)
+                    Label(self.stats_frame, text=away_value, font=("Helvetica", 14), background="#38003c", foreground="white").grid(row=i, column=2, padx=50, pady=5)
+            else:
+                messagebox.showinfo("No Data", "No match data found for the selected teams.")
+        else:
+            messagebox.showinfo("Selection Required", "Please select both teams and a year.")
+##################################################################################
 
     def show_league_page(self):
         self.clear_window()
@@ -958,9 +1053,6 @@ class Dashboard2:
 
         return player_data_dicts
 
-
-
-
     def fetch_teams_fpl(self, season):
         mydb = get_db_connection()
         mycursor = mydb.cursor()
@@ -995,12 +1087,6 @@ class Dashboard2:
         else:
             self.player_dropdown['state'] = 'disabled'
             self.selected_player.set('Select team and position first')
-
-            
-
-    
-
-
 
     def update_position_dropdown(self, *args):
         positions = ["Forward", "Goalkeeper", "Midfielder", "Defender"]
@@ -1438,6 +1524,7 @@ class Dashboard2:
 
 def wind():
     window = Tk()
+    window.state('zoomed')
     Dashboard2(window)
     window.mainloop()
 
