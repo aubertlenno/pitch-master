@@ -781,17 +781,35 @@ class Dashboard2:
         teams = sorted(data.keys())
         goals_matrix = np.array([[data[team].get(opponent, 0) for opponent in teams] for team in teams])
 
-        fig, ax = plt.subplots(figsize=(4, 2))
-        sns.heatmap(goals_matrix, annot=True, fmt="d", cmap='coolwarm', xticklabels=teams, yticklabels=teams, ax=ax)
-        ax.set_title("Goals Scored Against Each Team")
-        plt.xticks(rotation=45)
-        plt.yticks(rotation=45)
+        fig, ax = plt.subplots(figsize=(10, 8))  # Adjusted for a better view
+        heatmap = sns.heatmap(goals_matrix, annot=True, fmt="d", cmap='coolwarm', xticklabels=teams, yticklabels=teams, ax=ax)
+        
+        # Change the title color to white
+        ax.set_title("Goals Scored Against Each Team", color='white')
+        
+        # Change color of the annotations (the numbers inside the heatmap)
+        for text in heatmap.texts:
+            text.set_color('white')
+        
+        # Change color of the xticks and yticks to white
+        plt.xticks(rotation=45, color='white')
+        plt.yticks(rotation=45, color='white')
+
+        # Change the colorbar text color to white
+        cbar = ax.collections[0].colorbar
+        cbar.ax.yaxis.set_tick_params(color='white')
+        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
+
+        # Set the background color of the axis (where the heatmap is plotted)
+        ax.set_facecolor('#38003c')
+        
+        # Set the figure background color
+        fig.patch.set_facecolor('#38003c')
 
         # Embedding the heatmap in Tkinter
         canvas = FigureCanvasTkAgg(fig, master=self.window)
         canvas_widget = canvas.get_tk_widget()
-        canvas_widget.place(x=400, y=150, width=800, height=600)
-##################################################################################
+        canvas_widget.place(x=490, y=100, width=800, height=600)  # Adjust placement as needed
 
     def show_league_page(self):
         self.clear_window()
