@@ -59,6 +59,7 @@ def show_login():
                     window.destroy()
                     dashboard_root = Tk()
                     app = Dashboard2(dashboard_root)  # Instantiate the dashboard
+                    dashboard_root.state('zoomed')
                     dashboard_root.mainloop()  # Run the dashboard app
                 else:
                     messagebox.showerror("Login Error", "Incorrect password")
@@ -195,7 +196,8 @@ def show_login():
         borderwidth=0,
         highlightthickness=0,
         command=on_signin_clicked,
-        relief="flat"
+        relief="flat",
+        bg="#340080"
     )
     signin_login.place(
         x=52.0,
@@ -211,7 +213,8 @@ def show_login():
         borderwidth=0,
         highlightthickness=0,
         command= on_register_clicked,
-        relief="flat"
+        relief="flat",
+        bg="#340080"
     )
     register_login.place(
         x=52.0,

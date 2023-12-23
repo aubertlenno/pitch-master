@@ -74,7 +74,7 @@ class Dashboard2:
 
     def create_sidebar(self):
         self.sidebar = Frame(self.window, bg='#00ff85')
-        self.sidebar.place(x=0, y=0, width=300, height=750)
+        self.sidebar.place(x=0, y=0, width=300, height=2000)
 
         # Complete sidebar setup
         self.logoImage = ImageTk.PhotoImage(file='images/Logos.png')
@@ -1049,7 +1049,7 @@ class Dashboard2:
         self.formation_var = StringVar(value="4-3-3")  # set default formation
         formation_label = Label(self.window, text="Formation:", font=("Helvetica", 12), fg=fg_color, bg=bg_color)
         formation_label.place(x=350, y=95)
-        formation_menu = OptionMenu(self.window, self.formation_var, "4-3-3", "3-4-3", "4-4-2")
+        formation_menu = OptionMenu(self.window, self.formation_var, "4-3-3")
         formation_menu.config(fg=fg_color, bg=bg_color)
         formation_menu.place(x=450, y=95)
 

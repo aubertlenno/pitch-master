@@ -61,7 +61,7 @@ def show_register():
             conn.commit()
             messagebox.showinfo("Account Created", "Your account has been successfully created.")
             window.destroy()
-            login.main()
+            login.show_login()
         except mysql.Error as err:
             messagebox.showerror("Database Error", str(err))
         finally:
@@ -223,7 +223,8 @@ def show_register():
         borderwidth=0,
         highlightthickness=0,
         command=on_signup_clicked,
-        relief="flat"
+        relief="flat",
+        bg="#340080"
     )
     signup_register.place(
         x=52.0,
@@ -239,7 +240,8 @@ def show_register():
         borderwidth=0,
         highlightthickness=0,
         command=on_login_clicked,
-        relief="flat"
+        relief="flat",
+        bg="#340080"
     )
     signin_register.place(
         x=52.0,
