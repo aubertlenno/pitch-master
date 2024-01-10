@@ -587,11 +587,11 @@ class Dashboard2:
                 messagebox.showinfo("No Data", "Data not found for the selected player.")
 
     def fetch_teams_for_year(self, year):
-        table_name = f"players{year}"
+        table_name = f"teams{year}"
         try:
-            mydb = get_db_connection()  # Make sure this function is defined to connect to your database
+            mydb = get_db_connection()
             mycursor = mydb.cursor()
-            query = f"SELECT DISTINCT current_club FROM {table_name} ORDER BY current_club"
+            query = f"SELECT team_name FROM {table_name} ORDER BY team_name"
             mycursor.execute(query)
             teams = [team[0] for team in mycursor.fetchall()]
         except Exception as e:
@@ -603,12 +603,18 @@ class Dashboard2:
         return teams
 
     def fetch_players_for_team_position(self, team, position, year):
-        table_name = f"players{year}"
+        players_table = f"players{year}"
+        teams_table = f"teams{year}"
         try:
             mydb = get_db_connection()
             mycursor = mydb.cursor()
-            # Adjust the query to match the exact column name for position in your database
-            query = f"SELECT full_name FROM {table_name} WHERE current_club = %s AND position = %s ORDER BY full_name"
+            query = f"""
+                SELECT p.full_name 
+                FROM {players_table} p
+                INNER JOIN {teams_table} t ON p.current_club = t.id
+                WHERE t.team_name = %s AND p.position = %s
+                ORDER BY p.full_name
+            """
             mycursor.execute(query, (team, position))
             players = [player[0] for player in mycursor.fetchall()]
         except Exception as e:
@@ -619,22 +625,36 @@ class Dashboard2:
             mydb.close()
         return players
     
-    def fetch_player_data(self, player_name, team, year):
-        table_name = f"players{year}"
+    def fetch_player_data(self, player_name, team_name, year):
+        players_table = f"players{year}"
+        teams_table = f"teams{year}"
+        country_table = "country"
         try:
             mydb = get_db_connection()
             mycursor = mydb.cursor(dictionary=True)
+
+            # First, get the team ID for the selected team name
+            mycursor.execute(f"SELECT id FROM {teams_table} WHERE team_name = %s", (team_name,))
+            team_result = mycursor.fetchone()
+            if not team_result:
+                print(f"No team found for the name: {team_name}")
+                return {}
+
+            team_id = team_result['id']
+
+            # Now, fetch player data with the country name
             query = f"""
-                SELECT nationality, appearances_overall, goals_overall, assists_overall, penalty_goals,
-                    penalty_misses, clean_sheets_overall, conceded_overall, yellow_cards_overall,
-                    red_cards_overall, goals_involved_per_90_overall, goals_per_90_overall, 
-                    conceded_per_90_overall, cards_per_90_overall, min_per_match, min_per_assist_overall,
-                    rank_in_league_top_attackers, rank_in_league_top_midfielders, rank_in_league_top_defenders, 
-                    rank_in_club_top_scorer
-                FROM {table_name}
-                WHERE full_name = %s AND current_club = %s
+                SELECT c.country_name as nationality, p.appearances_overall, p.goals_overall, p.assists_overall, 
+                    p.penalty_goals, p.penalty_misses, p.clean_sheets_overall, p.conceded_overall, p.yellow_cards_overall,
+                    p.red_cards_overall, p.goals_involved_per_90_overall, p.goals_per_90_overall, 
+                    p.conceded_per_90_overall, p.cards_per_90_overall, p.min_per_match, p.min_per_assist_overall,
+                    p.rank_in_league_top_attackers, p.rank_in_league_top_midfielders, p.rank_in_league_top_defenders, 
+                    p.rank_in_club_top_scorer
+                FROM {players_table} p
+                INNER JOIN {country_table} c ON p.nationality = c.country_id
+                WHERE p.full_name = %s AND p.current_club = %s
             """
-            mycursor.execute(query, (player_name, team))
+            mycursor.execute(query, (player_name, team_id))
             player_data = mycursor.fetchone()
         except Exception as e:
             print(f"Error fetching player data: {e}")
@@ -749,7 +769,11 @@ class Dashboard2:
     def fetch_home_teams(self, year):
         mydb = get_db_connection()
         mycursor = mydb.cursor()
-        query = f"SELECT DISTINCT home_team_name FROM matches{year}"
+        query = f"""
+            SELECT DISTINCT t.team_name 
+            FROM matches{year} m 
+            JOIN teams{year} t ON m.home_team_id = t.id
+        """
         mycursor.execute(query)
         teams = [team[0] for team in mycursor.fetchall()]
         mycursor.close()
@@ -774,7 +798,12 @@ class Dashboard2:
     def fetch_away_teams(self, year, home_team):
         mydb = get_db_connection()
         mycursor = mydb.cursor()
-        query = f"SELECT DISTINCT away_team_name FROM matches{year} WHERE home_team_name = %s"
+        query = f"""
+            SELECT DISTINCT t.team_name 
+            FROM matches{year} m 
+            JOIN teams{year} t ON m.away_team_id = t.id 
+            WHERE m.home_team_id = (SELECT id FROM teams{year} WHERE team_name = %s)
+        """
         mycursor.execute(query, (home_team,))
         teams = [team[0] for team in mycursor.fetchall()]
         mycursor.close()
@@ -784,7 +813,13 @@ class Dashboard2:
     def fetch_match_data(self, year, home_team, away_team):
         mydb = get_db_connection()
         mycursor = mydb.cursor(dictionary=True)
-        query = f"SELECT * FROM matches{year} WHERE home_team_name = %s AND away_team_name = %s"
+        query = f"""
+            SELECT m.*, ht.team_name AS home_team_name, at.team_name AS away_team_name 
+            FROM matches{year} m
+            JOIN teams{year} ht ON m.home_team_id = ht.id
+            JOIN teams{year} at ON m.away_team_id = at.id
+            WHERE ht.team_name = %s AND at.team_name = %s
+        """
         mycursor.execute(query, (home_team, away_team))
         match_data = mycursor.fetchone()
         mycursor.close()
@@ -827,7 +862,13 @@ class Dashboard2:
     def fetch_matches_data_graph(self, year):
         mydb = get_db_connection()
         mycursor = mydb.cursor()
-        query = f"SELECT home_team_name, away_team_name, home_team_goal_count, away_team_goal_count FROM matches{year}"
+        query = f"""
+            SELECT ht.team_name AS home_team_name, at.team_name AS away_team_name, 
+                m.home_team_goal_count, m.away_team_goal_count 
+            FROM matches{year} m
+            JOIN teams{year} ht ON m.home_team_id = ht.id
+            JOIN teams{year} at ON m.away_team_id = at.id
+        """
         mycursor.execute(query)
         matches = mycursor.fetchall()
         mycursor.close()
@@ -839,6 +880,10 @@ class Dashboard2:
         for home_team, away_team, home_goals, away_goals in matches:
             home_abbr = self.team_abbreviations.get(home_team, home_team)
             away_abbr = self.team_abbreviations.get(away_team, away_team)
+
+            # Ensure home_goals and away_goals are integers
+            home_goals = int(home_goals)
+            away_goals = int(away_goals)
 
             if home_abbr not in goals_data:
                 goals_data[home_abbr] = {}
